@@ -19,15 +19,14 @@ def indy_joystick_sim(name, queue):
     randd = (np.random.rand(1)*180-90)/1000
     rando = np.random.rand(1)*15-7.5
     objId = p.loadURDF('/home/frank/code/pybullet_smc/bullet3/data/banana/object_1.urdf', basePosition=[-0.5, 0.0, 0],baseOrientation=p.getQuaternionFromEuler([(33.9+randx )/180*math.pi,(25.5+randy)/180*math.pi,0]))
-    indyId= p.loadURDF("/home/frank/code/pybullet_smc/bullet3/data/indy7.urdf", [0, 0, 0])
+    indyId= p.loadURDF("indy7.urdf", [0, 0, 0])
     p.resetBasePositionAndOrientation(indyId, [0, 0, 0.03], [0, 0, 0, 1])
     #cid = p.createConstraint(indyId, -1, -1, -1, p.JOINT_FIXED, [0, 0, 0], [0, 0, 0], [0, 0, 0],[0,0,0])
-    indyEndEffectorIndex = 6
+    indyEndEffectorIndex = 7
     numJoints = p.getNumJoints(indyId)
     print("numJoints",numJoints)
-    if (numJoints != 8):
-        exit()
-    numJoints =numJoints-1
+
+    #numJoints =8
     #lower limits for null space
     ll = [-.967, -2, -2.96, 0.19, -2.96, -2.09, -3.05]
     #upper limits for null space
@@ -35,10 +34,10 @@ def indy_joystick_sim(name, queue):
     #joint ranges for null space
     jr = [6.10865, 6.10865, 6.10865, 6.10865, 6.10865, 6.10865, 6.10865]
     #restposes for null space
-    rp = [0,0,0,0,0,0,0,0]
+    rp = [0,0,0,0,0,0,0]
     #joint damping coefficents
     jd = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
-    for i in range(numJoints):
+    for i in range(7):
         p.resetJointState(indyId, i, rp[i])
 
     p.setGravity(0, 0, -10)
@@ -46,7 +45,7 @@ def indy_joystick_sim(name, queue):
     prevPose = [0, 0, 0]
     prevPose1 = [0, 0, 0]
     hasPrevPose = 0
-    useNullSpace = 0
+    useNullSpace = 1
 
     useOrientation = 1
     #If we set useSimulation=0, it sets the arm pose to be the IK result directly without using dynamic control.
@@ -83,8 +82,8 @@ def indy_joystick_sim(name, queue):
             p.stepSimulation()
         movey = 0.5*math.sin(angle)
         angle = angle+0.1
-        obj_pos_orn = p.getBasePositionAndOrientation(objId)
-        p.resetBasePositionAndOrientation(objId,(obj_pos_orn[0][0], movey,obj_pos_orn[0][2]),obj_pos_orn[1])
+        #obj_pos_orn = p.getBasePositionAndOrientation(objId)
+        #p.resetBasePositionAndOrientation(objId,(obj_pos_orn[0][0], movey,obj_pos_orn[0][2]),obj_pos_orn[1])
         try:
             value = queue.get(True, 1)
             #print(value)
@@ -105,9 +104,12 @@ def indy_joystick_sim(name, queue):
 
                 orn = p.getQuaternionFromEuler([(33.9+thela1 )/180*math.pi,(25.5+thela2)/180*math.pi,(25.5+thela3)/180*math.pi])
                 #print(orn)
+                finger_target = 0.04 - 0.03 * value['joystick0']['button5']
+                print(finger_target)
             else:
                 pos = [-0.5,0, 0.5]
                 orn = p.getQuaternionFromEuler([0, -math.pi, 0])
+                finger_target = 0.04
             #end effector points down, not up (in case useOrientation==1)
             
 
@@ -130,7 +132,7 @@ def indy_joystick_sim(name, queue):
                                                             restPoses=rp)
             else:
                 if (useOrientation == 1):
-                    print(orn)
+                    #print(orn)
                     jointPoses = p.calculateInverseKinematics(indyId,
                                                             indyEndEffectorIndex,
                                                             pos,
@@ -147,7 +149,7 @@ def indy_joystick_sim(name, queue):
 
             if (useSimulation):
                 i = 0
-                for i in range(numJoints-1):
+                for i in range(7):
                     p.setJointMotorControl2(bodyIndex=indyId,
                                             jointIndex=i+1,
                                             controlMode=p.POSITION_CONTROL,
@@ -158,9 +160,12 @@ def indy_joystick_sim(name, queue):
                                             velocityGain=1.5)
             else:
             #reset the joint state (ignoring all dynamics, not recommended to use during simulation)
-                for i in range(numJoints-1):
+                for i in range(7):
                     p.resetJointState(indyId, i+1, jointPoses[i])
 
+
+        for i in [9,10]:
+            p.setJointMotorControl2(indyId, i, p.POSITION_CONTROL,finger_target ,force= 10)
         ls = p.getLinkState(indyId, indyEndEffectorIndex)
         
         end_pos = ls[4]
